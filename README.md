@@ -25,3 +25,7 @@ To check the project:
 flutter analyze
 flutter test
 ```
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
