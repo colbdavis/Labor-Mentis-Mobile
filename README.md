@@ -13,6 +13,9 @@ The **Scores** screen calculates the overall average and groups results by
 category. Content is currently defined in Dart to keep the first prototype
 simple; the next step is importing validated YAML quiz packs locally.
 
+The planned YAML format is documented in
+[YAML Quiz Pack Guide](docs/YAML_QUIZ_GUIDE.md).
+
 ## Run
 
 ```zsh
