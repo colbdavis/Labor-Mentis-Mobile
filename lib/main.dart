@@ -30,17 +30,17 @@ enum GameMode { multipleChoice, trueFalse, text, matching }
 
 extension GameModeDetails on GameMode {
   String get label => switch (this) {
-    GameMode.multipleChoice => 'Scelta multipla',
-    GameMode.trueFalse => 'Vero o falso',
-    GameMode.text => 'Risposta testuale',
-    GameMode.matching => 'Collega le coppie',
+    GameMode.multipleChoice => 'Multiple choice',
+    GameMode.trueFalse => 'True or false',
+    GameMode.text => 'Text answer',
+    GameMode.matching => 'Match the pairs',
   };
 
   String get description => switch (this) {
-    GameMode.multipleChoice => 'Scegli la risposta giusta fra quattro opzioni.',
-    GameMode.trueFalse => 'Decidi se ogni affermazione è corretta.',
-    GameMode.text => 'Scrivi una risposta breve.',
-    GameMode.matching => 'Associa ogni elemento al suo corrispondente.',
+    GameMode.multipleChoice => 'Choose the right answer from four options.',
+    GameMode.trueFalse => 'Decide whether each statement is correct.',
+    GameMode.text => 'Write a short answer.',
+    GameMode.matching => 'Match each item with its corresponding pair.',
   };
 
   IconData get icon => switch (this) {
@@ -111,76 +111,73 @@ class QuizResult {
 
 const _packs = [
   QuizPack(
-    id: 'geografia-capitali-1',
-    title: 'Capitali del mondo',
-    category: 'Geografia',
+    id: 'geography-capitals-1',
+    title: 'World capitals',
+    category: 'Geography',
     mode: GameMode.multipleChoice,
     questions: [
       QuizQuestion(
-        prompt: 'Qual è la capitale del Portogallo?',
-        options: ['Madrid', 'Lisbona', 'Porto', 'Barcellona'],
+        prompt: 'What is the capital of Portugal?',
+        options: ['Madrid', 'Lisbon', 'Porto', 'Barcelona'],
         correctOption: 1,
       ),
       QuizQuestion(
-        prompt: 'Quale città è la capitale del Canada?',
+        prompt: 'Which city is the capital of Canada?',
         options: ['Toronto', 'Vancouver', 'Ottawa', 'Montréal'],
         correctOption: 2,
       ),
       QuizQuestion(
-        prompt: 'Qual è la capitale dell’Australia?',
+        prompt: 'What is the capital of Australia?',
         options: ['Sydney', 'Melbourne', 'Canberra', 'Perth'],
         correctOption: 2,
       ),
     ],
   ),
   QuizPack(
-    id: 'scienza-vero-falso-1',
-    title: 'Scienza essenziale',
-    category: 'Scienze',
+    id: 'science-true-false-1',
+    title: 'Essential science',
+    category: 'Science',
     mode: GameMode.trueFalse,
     questions: [
       QuizQuestion(
-        prompt: 'L’acqua bolle a 100 °C al livello del mare.',
+        prompt: 'Water boils at 100 °C at sea level.',
         correctOption: 0,
       ),
-      QuizQuestion(prompt: 'Il Sole è un pianeta.', correctOption: 1),
-      QuizQuestion(
-        prompt: 'Le piante assorbono anidride carbonica.',
-        correctOption: 0,
-      ),
+      QuizQuestion(prompt: 'The Sun is a planet.', correctOption: 1),
+      QuizQuestion(prompt: 'Plants absorb carbon dioxide.', correctOption: 0),
     ],
   ),
   QuizPack(
-    id: 'italiano-parole-1',
-    title: 'Parole italiane',
-    category: 'Lingua italiana',
+    id: 'italian-words-1',
+    title: 'Italian words',
+    category: 'Italian language',
     mode: GameMode.text,
     questions: [
       QuizQuestion(
-        prompt: 'Qual è il plurale di “uovo”?',
+        prompt: 'What is the plural of “uovo”?',
         acceptedAnswers: ['uova'],
       ),
       QuizQuestion(
-        prompt: 'Come si chiama una parola dal significato opposto?',
+        prompt: 'What do you call a word with the opposite meaning?',
         acceptedAnswers: ['contrario', 'antonimo'],
       ),
       QuizQuestion(
-        prompt: 'Completa: “né carne né …”',
+        prompt: 'Complete the Italian expression: “né carne né …”',
         acceptedAnswers: ['pesce'],
       ),
     ],
   ),
   QuizPack(
-    id: 'storia-coppie-1',
-    title: 'Autori e opere',
-    category: 'Letteratura',
+    id: 'literature-matching-1',
+    title: 'Authors and works',
+    category: 'Literature',
     mode: GameMode.matching,
     questions: [
       QuizQuestion(
-        prompt: 'Collega ogni autore alla sua opera.',
+        prompt: 'Match each author with their work.',
         pairs: [
           MatchPair('Dante', 'Divina Commedia'),
-          MatchPair('Manzoni', 'I promessi sposi'),
+          MatchPair('Manzoni', 'I Promessi Sposi'),
           MatchPair('Leopardi', 'L’infinito'),
         ],
       ),
@@ -222,11 +219,11 @@ class _AppShellState extends State<AppShell> {
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.play_circle_outline),
-            label: 'Gioca',
+            label: 'Play',
           ),
           NavigationDestination(
             icon: Icon(Icons.insights_outlined),
-            label: 'Punteggi',
+            label: 'Scores',
           ),
         ],
       ),
@@ -253,21 +250,21 @@ class HomePage extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Impara giocando, anche senza connessione.',
+          'Learn by playing, even offline.',
           style: theme.textTheme.bodyLarge,
         ),
         const SizedBox(height: 24),
         _WelcomeCard(),
         const SizedBox(height: 28),
         Text(
-          'Quiz inclusi',
+          'Included quizzes',
           style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.w700,
           ),
         ),
         const SizedBox(height: 4),
         Text(
-          'Ogni pacchetto usa una modalità diversa.',
+          'Each pack uses a different game mode.',
           style: theme.textTheme.bodyMedium,
         ),
         const SizedBox(height: 14),
@@ -281,11 +278,11 @@ class HomePage extends StatelessWidget {
         OutlinedButton.icon(
           onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('L’importazione YAML arriverà nel prossimo passo.'),
+              content: Text('YAML import will be added in the next step.'),
             ),
           ),
           icon: const Icon(Icons.upload_file_outlined),
-          label: const Text('Importa un quiz YAML'),
+          label: const Text('Import a YAML quiz'),
         ),
       ],
     );
@@ -310,7 +307,7 @@ class _WelcomeCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Piccolo oggi, espandibile domani',
+                  'Small today, expandable tomorrow',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
@@ -319,7 +316,7 @@ class _WelcomeCard extends StatelessWidget {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'Gioca ai quiz inclusi e, in futuro, importa i tuoi file.',
+                  'Play the included quizzes and import your own files in the future.',
                   style: TextStyle(color: Color(0xffe0e7ff)),
                 ),
               ],
@@ -466,7 +463,7 @@ class _QuizPageState extends State<QuizPage> {
     }
     final color = widget.pack.mode.color;
     final options = widget.pack.mode == GameMode.trueFalse
-        ? const ['Vero', 'Falso']
+        ? const ['True', 'False']
         : _question.options;
     return Scaffold(
       appBar: AppBar(title: Text(widget.pack.title)),
@@ -511,7 +508,7 @@ class _QuizPageState extends State<QuizPage> {
                 const SizedBox(height: 12),
                 FilledButton(
                   onPressed: _answered ? null : _answerText,
-                  child: const Text('Controlla'),
+                  child: const Text('Check answer'),
                 ),
               ] else ...[
                 ...List.generate(
@@ -540,7 +537,7 @@ class _QuizPageState extends State<QuizPage> {
                   label: Text(
                     _questionIndex == widget.pack.questions.length - 1
                         ? 'Vedi risultato'
-                        : 'Continua',
+                        : 'Continue',
                   ),
                 ),
               ],
@@ -561,7 +558,7 @@ class _QuizPageState extends State<QuizPage> {
   String _correctAnswerText() => widget.pack.mode == GameMode.text
       ? _question.acceptedAnswers.first
       : widget.pack.mode == GameMode.trueFalse
-      ? const ['Vero', 'Falso'][_question.correctOption!]
+      ? const ['True', 'False'][_question.correctOption!]
       : _question.options[_question.correctOption!];
 }
 
@@ -680,7 +677,7 @@ class _Feedback extends StatelessWidget {
             child: Text(
               correct
                   ? 'Corretto. Ottimo lavoro!'
-                  : 'Risposta corretta: $correctAnswer',
+                  : 'Correct answer: $correctAnswer',
               style: TextStyle(color: color, fontWeight: FontWeight.w600),
             ),
           ),
@@ -699,7 +696,7 @@ class QuizSummaryPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final percentage = (result.correct / result.total * 100).round();
     return Scaffold(
-      appBar: AppBar(title: const Text('Risultato')),
+      appBar: AppBar(title: const Text('Result')),
       body: SafeArea(
         child: Center(
           child: Padding(
@@ -725,7 +722,7 @@ class QuizSummaryPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${result.correct} risposte corrette su ${result.total}',
+                  '${result.correct} correct answers out of ${result.total}',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
@@ -733,7 +730,7 @@ class QuizSummaryPage extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: () => Navigator.of(context).pop(result),
                   icon: const Icon(Icons.check_rounded),
-                  label: const Text('Torna ai quiz'),
+                  label: const Text('Back to quizzes'),
                 ),
               ],
             ),
@@ -853,7 +850,7 @@ class _MatchingPageState extends State<MatchingPage> {
                       Expanded(
                         child: OutlinedButton(
                           onPressed: null,
-                          child: Text(match ?? 'Scegli sotto'),
+                          child: Text(match ?? 'Choose below'),
                         ),
                       ),
                     ],
@@ -885,7 +882,7 @@ class _MatchingPageState extends State<MatchingPage> {
                 onPressed: _matches.length == _question.pairs.length
                     ? _finish
                     : null,
-                child: const Text('Controlla collegamenti'),
+                child: const Text('Check matches'),
               ),
             ],
           ),
@@ -949,7 +946,7 @@ class ScoresPage extends StatelessWidget {
               Text(
                 total == 0
                     ? 'Completa un quiz per iniziare.'
-                    : '$correct risposte corrette su $total',
+                    : '$correct correct answers out of $total',
                 style: const TextStyle(color: Color(0xffccfbf1)),
               ),
             ],
@@ -957,7 +954,7 @@ class ScoresPage extends StatelessWidget {
         ),
         const SizedBox(height: 28),
         Text(
-          'Per categoria',
+          'By category',
           style: Theme.of(
             context,
           ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
@@ -967,9 +964,7 @@ class ScoresPage extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.only(top: 24),
             child: Center(
-              child: Text(
-                'Nessun quiz completato. Torna a “Gioca” per cominciare.',
-              ),
+              child: Text('No quizzes completed. Go to “Play” to get started.'),
             ),
           )
         else
@@ -994,7 +989,7 @@ class ScoresPage extends StatelessWidget {
                 ),
                 title: Text(entry.key),
                 subtitle: Text(
-                  '${categoryResults.length} ${categoryResults.length == 1 ? 'quiz completato' : 'quiz completati'}',
+                  '${categoryResults.length} ${categoryResults.length == 1 ? 'quiz completed' : 'quizzes completed'}',
                 ),
                 trailing: Text(
                   '$categoryPercentage%',

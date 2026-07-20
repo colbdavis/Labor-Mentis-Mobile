@@ -5,13 +5,13 @@ void main() {
   testWidgets('a default quiz can be opened from the catalog', (tester) async {
     await tester.pumpWidget(const LaborMentisApp());
 
-    expect(find.text('Quiz inclusi'), findsOneWidget);
-    expect(find.text('Capitali del mondo'), findsOneWidget);
+    expect(find.text('Included quizzes'), findsOneWidget);
+    expect(find.text('World capitals'), findsOneWidget);
 
-    await tester.tap(find.text('Capitali del mondo'));
+    await tester.tap(find.text('World capitals'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Qual è la capitale del Portogallo?'), findsOneWidget);
-    expect(find.text('Lisbona'), findsOneWidget);
+    expect(find.text('What is the capital of Portugal?'), findsOneWidget);
+    expect(find.text('Lisbon'), findsOneWidget);
   });
 }

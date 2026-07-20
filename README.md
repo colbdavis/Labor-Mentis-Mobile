@@ -1,26 +1,25 @@
 # Labor Mentis
 
-Prototipo Flutter offline di un motore per quiz e minigiochi configurabili.
+Offline Flutter prototype of a configurable quiz and minigame engine.
 
-Al momento include pochi quiz dimostrativi e quattro modalità giocabili:
+The prototype includes a few built-in quiz packs and four playable modes:
 
-- scelta multipla;
-- vero/falso;
-- risposta testuale;
-- collegamento fra coppie.
+- multiple choice;
+- true or false;
+- text answer;
+- matching pairs.
 
-La schermata **Punteggi** calcola la media delle risposte corrette nella
-sessione corrente. I contenuti sono per ora definiti in Dart per tenere il
-primo prototipo semplice; il prossimo passo sarà importare pacchetti YAML
-validati localmente.
+The **Scores** screen calculates the overall average and groups results by
+category. Content is currently defined in Dart to keep the first prototype
+simple; the next step is importing validated YAML quiz packs locally.
 
-## Avvio
+## Run
 
 ```zsh
 flutter run
 ```
 
-Per controllare il progetto:
+To check the project:
 
 ```zsh
 flutter analyze
