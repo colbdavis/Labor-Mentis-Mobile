@@ -4,8 +4,7 @@ Labor Mentis quiz packs are plain-text YAML files. You can write them in any
 text editor or generate a draft with an AI tool, then review and import them
 locally.
 
-> This document defines the planned version 1 import format. The YAML importer
-> is not implemented in the current prototype yet.
+This document defines the implemented version 1 import format.
 
 ## Quick start
 
@@ -13,7 +12,7 @@ locally.
 2. Copy one of the examples below.
 3. Give the pack a unique, stable `id`.
 4. Choose exactly one `mode` for the whole pack.
-5. Save the file and import it from the app when YAML import is available.
+5. Save the file and select **Import a YAML quiz** in the app.
 
 YAML uses indentation to represent structure. Use spaces, not tabs. Two spaces
 per level is recommended.
@@ -192,7 +191,7 @@ can contain factual errors, ambiguous wording, or invalid YAML.
 
 ## Limits and safety
 
-The planned importer accepts only local `.yaml` and `.yml` files. It will not
+The importer accepts only local `.yaml` and `.yml` files. It does not
 download content, follow links, execute code, or contact an AI service. Files
 must be no larger than 1 MB and may contain up to 500 questions.
 

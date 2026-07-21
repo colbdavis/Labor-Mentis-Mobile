@@ -10,8 +10,8 @@ The prototype includes a few built-in quiz packs and four playable modes:
 - matching pairs.
 
 The **Scores** screen calculates the overall average and groups results by
-category. Content is currently defined in Dart to keep the first prototype
-simple; the next step is importing validated YAML quiz packs locally.
+category. Users can import validated YAML quiz packs from local storage; packs
+are kept in the app's private storage and remain available after restart.
 
 The planned YAML format is documented in
 [YAML Quiz Pack Guide](docs/YAML_QUIZ_GUIDE.md).

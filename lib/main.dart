@@ -1,9 +1,20 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+
+import 'import/quiz_catalog.dart';
+import 'import/quiz_import_error.dart';
+import 'import/quiz_yaml_parser.dart';
+import 'models/game_mode.dart';
+import 'models/quiz_pack.dart';
+import 'models/quiz_question.dart';
+import 'models/quiz_result.dart';
 
 void main() => runApp(const LaborMentisApp());
 
-const _indigo = Color(0xff4f46e5);
-const _mint = Color(0xff0f766e);
+const _indigo = indigo;
+const _mint = mint;
 
 class LaborMentisApp extends StatelessWidget {
   const LaborMentisApp({super.key});
@@ -26,165 +37,6 @@ class LaborMentisApp extends StatelessWidget {
   }
 }
 
-enum GameMode { multipleChoice, trueFalse, text, matching }
-
-extension GameModeDetails on GameMode {
-  String get label => switch (this) {
-    GameMode.multipleChoice => 'Multiple choice',
-    GameMode.trueFalse => 'True or false',
-    GameMode.text => 'Text answer',
-    GameMode.matching => 'Match the pairs',
-  };
-
-  String get description => switch (this) {
-    GameMode.multipleChoice => 'Choose the right answer from four options.',
-    GameMode.trueFalse => 'Decide whether each statement is correct.',
-    GameMode.text => 'Write a short answer.',
-    GameMode.matching => 'Match each item with its corresponding pair.',
-  };
-
-  IconData get icon => switch (this) {
-    GameMode.multipleChoice => Icons.quiz_outlined,
-    GameMode.trueFalse => Icons.check_circle_outline,
-    GameMode.text => Icons.short_text_rounded,
-    GameMode.matching => Icons.account_tree_outlined,
-  };
-
-  Color get color => switch (this) {
-    GameMode.multipleChoice => _indigo,
-    GameMode.trueFalse => _mint,
-    GameMode.text => const Color(0xffc2410c),
-    GameMode.matching => const Color(0xffa21caf),
-  };
-}
-
-class QuizPack {
-  const QuizPack({
-    required this.id,
-    required this.title,
-    required this.category,
-    required this.mode,
-    required this.questions,
-  });
-
-  final String id;
-  final String title;
-  final String category;
-  final GameMode mode;
-  final List<QuizQuestion> questions;
-}
-
-class QuizQuestion {
-  const QuizQuestion({
-    required this.prompt,
-    this.options = const [],
-    this.correctOption,
-    this.acceptedAnswers = const [],
-    this.pairs = const [],
-  });
-
-  final String prompt;
-  final List<String> options;
-  final int? correctOption;
-  final List<String> acceptedAnswers;
-  final List<MatchPair> pairs;
-}
-
-class MatchPair {
-  const MatchPair(this.left, this.right);
-
-  final String left;
-  final String right;
-}
-
-class QuizResult {
-  const QuizResult({
-    required this.pack,
-    required this.correct,
-    required this.total,
-  });
-
-  final QuizPack pack;
-  final int correct;
-  final int total;
-}
-
-const _packs = [
-  QuizPack(
-    id: 'geography-capitals-1',
-    title: 'World capitals',
-    category: 'Geography',
-    mode: GameMode.multipleChoice,
-    questions: [
-      QuizQuestion(
-        prompt: 'What is the capital of Portugal?',
-        options: ['Madrid', 'Lisbon', 'Porto', 'Barcelona'],
-        correctOption: 1,
-      ),
-      QuizQuestion(
-        prompt: 'Which city is the capital of Canada?',
-        options: ['Toronto', 'Vancouver', 'Ottawa', 'Montréal'],
-        correctOption: 2,
-      ),
-      QuizQuestion(
-        prompt: 'What is the capital of Australia?',
-        options: ['Sydney', 'Melbourne', 'Canberra', 'Perth'],
-        correctOption: 2,
-      ),
-    ],
-  ),
-  QuizPack(
-    id: 'science-true-false-1',
-    title: 'Essential science',
-    category: 'Science',
-    mode: GameMode.trueFalse,
-    questions: [
-      QuizQuestion(
-        prompt: 'Water boils at 100 °C at sea level.',
-        correctOption: 0,
-      ),
-      QuizQuestion(prompt: 'The Sun is a planet.', correctOption: 1),
-      QuizQuestion(prompt: 'Plants absorb carbon dioxide.', correctOption: 0),
-    ],
-  ),
-  QuizPack(
-    id: 'italian-words-1',
-    title: 'Italian words',
-    category: 'Italian language',
-    mode: GameMode.text,
-    questions: [
-      QuizQuestion(
-        prompt: 'What is the plural of “uovo”?',
-        acceptedAnswers: ['uova'],
-      ),
-      QuizQuestion(
-        prompt: 'What do you call a word with the opposite meaning?',
-        acceptedAnswers: ['contrario', 'antonimo'],
-      ),
-      QuizQuestion(
-        prompt: 'Complete the Italian expression: “né carne né …”',
-        acceptedAnswers: ['pesce'],
-      ),
-    ],
-  ),
-  QuizPack(
-    id: 'literature-matching-1',
-    title: 'Authors and works',
-    category: 'Literature',
-    mode: GameMode.matching,
-    questions: [
-      QuizQuestion(
-        prompt: 'Match each author with their work.',
-        pairs: [
-          MatchPair('Dante', 'Divina Commedia'),
-          MatchPair('Manzoni', 'I Promessi Sposi'),
-          MatchPair('Leopardi', 'L’infinito'),
-        ],
-      ),
-    ],
-  ),
-];
-
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
 
@@ -195,6 +47,28 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _tab = 0;
   final List<QuizResult> _results = [];
+  final QuizCatalog _catalog = QuizCatalog();
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _catalog.addListener(_catalogChanged);
+    _catalog.load().whenComplete(() {
+      if (mounted) setState(() => _loading = false);
+    });
+  }
+
+  void _catalogChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _catalog.removeListener(_catalogChanged);
+    _catalog.dispose();
+    super.dispose();
+  }
 
   void _openQuiz(QuizPack pack) async {
     final result = await Navigator.of(
@@ -205,12 +79,202 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
+  Future<void> _importQuiz() async {
+    final selection = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['yaml', 'yml'],
+      allowMultiple: false,
+      withData: true,
+    );
+    if (selection == null || !mounted) return;
+    final file = selection.files.single;
+    if (!RegExp(r'\.ya?ml$', caseSensitive: false).hasMatch(file.name)) {
+      await _showIssues([
+        const QuizImportIssue('file', 'Choose a .yaml or .yml file.'),
+      ]);
+      return;
+    }
+    if (file.size > QuizYamlParser.maxSourceBytes) {
+      await _showIssues([
+        const QuizImportIssue('file', 'File exceeds the 1 MB limit.'),
+      ]);
+      return;
+    }
+    final bytes = file.bytes;
+    if (bytes == null) {
+      await _showIssues([
+        const QuizImportIssue('file', 'The selected file could not be read.'),
+      ]);
+      return;
+    }
+    String source;
+    try {
+      source = utf8.decode(bytes, allowMalformed: false);
+    } on FormatException {
+      await _showIssues([
+        const QuizImportIssue(
+          'file',
+          'The file must contain valid UTF-8 text.',
+        ),
+      ]);
+      return;
+    }
+    final result = QuizYamlParser().parse(source);
+    if (!result.isValid) {
+      await _showIssues([...result.errors, ...result.warnings]);
+      return;
+    }
+    final pack = result.pack as QuizPack;
+    if (_catalog.isBuiltInId(pack.id)) {
+      await _showIssues([
+        const QuizImportIssue(
+          'id',
+          'This ID belongs to a built-in quiz and cannot be overwritten.',
+        ),
+      ]);
+      return;
+    }
+    final existing = _catalog.find(pack.id);
+    final accepted = await _confirmImport(pack, existing, result.warnings);
+    if (accepted != true || !mounted) return;
+    try {
+      await _catalog.save(source, pack);
+    } catch (error) {
+      if (mounted) {
+        await _showIssues([
+          QuizImportIssue('file', 'Could not save the quiz: $error'),
+        ]);
+      }
+    }
+  }
+
+  Future<bool?> _confirmImport(
+    QuizPack pack,
+    QuizPack? existing,
+    List<QuizImportIssue> warnings,
+  ) {
+    final versionMessage = existing == null
+        ? null
+        : pack.version > existing.version
+        ? 'This updates version ${existing.version} to ${pack.version}.'
+        : pack.version < existing.version
+        ? 'Warning: this downgrades version ${existing.version} to ${pack.version}.'
+        : 'Version ${pack.version} is already installed. This will replace it.';
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(existing == null ? 'Import quiz?' : 'Replace quiz?'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(pack.title, style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 12),
+              Text(
+                'Category: ${pack.category}\nMode: ${pack.mode.label}\nQuestions: ${pack.questions.length}\nID: ${pack.id}\nVersion: ${pack.version}',
+              ),
+              if (versionMessage != null) ...[
+                const SizedBox(height: 12),
+                Text(versionMessage),
+              ],
+              if (warnings.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text('${warnings.length} warning(s) found.'),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(existing == null ? 'Import' : 'Replace'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showIssues(List<QuizImportIssue> issues) => showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Quiz could not be imported'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: SelectableText(
+            issues.map((issue) => issue.toString()).join('\n\n'),
+          ),
+        ),
+      ),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+      ],
+    ),
+  );
+
+  Future<void> _manageQuiz(QuizPack pack) async {
+    if (!pack.isImported) return;
+    final remove = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(pack.title),
+        content: Text(
+          'Imported quiz\nID: ${pack.id}\nVersion: ${pack.version}\n${pack.questions.length} questions',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Close'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (remove == true && mounted) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Remove imported quiz?'),
+          content: Text('Remove “${pack.title}” from this device?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Remove'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed == true) await _catalog.remove(pack.id);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
         child: _tab == 0
-            ? HomePage(onOpenQuiz: _openQuiz)
+            ? HomePage(
+                packs: _catalog.packs,
+                loading: _loading,
+                onOpenQuiz: _openQuiz,
+                onImport: _importQuiz,
+                onManageQuiz: _manageQuiz,
+              )
             : ScoresPage(results: _results),
       ),
       bottomNavigationBar: NavigationBar(
@@ -232,9 +296,20 @@ class _AppShellState extends State<AppShell> {
 }
 
 class HomePage extends StatelessWidget {
-  const HomePage({required this.onOpenQuiz, super.key});
+  const HomePage({
+    required this.packs,
+    required this.loading,
+    required this.onOpenQuiz,
+    required this.onImport,
+    required this.onManageQuiz,
+    super.key,
+  });
 
+  final List<QuizPack> packs;
+  final bool loading;
   final ValueChanged<QuizPack> onOpenQuiz;
+  final VoidCallback onImport;
+  final ValueChanged<QuizPack> onManageQuiz;
 
   @override
   Widget build(BuildContext context) {
@@ -268,19 +343,20 @@ class HomePage extends StatelessWidget {
           style: theme.textTheme.bodyMedium,
         ),
         const SizedBox(height: 14),
-        ..._packs.map(
+        if (loading) const LinearProgressIndicator(),
+        ...packs.map(
           (pack) => Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: QuizPackCard(pack: pack, onTap: () => onOpenQuiz(pack)),
+            child: QuizPackCard(
+              pack: pack,
+              onTap: () => onOpenQuiz(pack),
+              onManage: pack.isImported ? () => onManageQuiz(pack) : null,
+            ),
           ),
         ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
-          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('YAML import will be added in the next step.'),
-            ),
-          ),
+          onPressed: onImport,
           icon: const Icon(Icons.upload_file_outlined),
           label: const Text('Import a YAML quiz'),
         ),
@@ -316,7 +392,7 @@ class _WelcomeCard extends StatelessWidget {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'Play the included quizzes and import your own files in the future.',
+                  'Play the included quizzes and import your own YAML files.',
                   style: TextStyle(color: Color(0xffe0e7ff)),
                 ),
               ],
@@ -329,10 +405,16 @@ class _WelcomeCard extends StatelessWidget {
 }
 
 class QuizPackCard extends StatelessWidget {
-  const QuizPackCard({required this.pack, required this.onTap, super.key});
+  const QuizPackCard({
+    required this.pack,
+    required this.onTap,
+    this.onManage,
+    super.key,
+  });
 
   final QuizPack pack;
   final VoidCallback onTap;
+  final VoidCallback? onManage;
 
   @override
   Widget build(BuildContext context) {
@@ -376,7 +458,14 @@ class QuizPackCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded),
+              if (pack.isImported)
+                IconButton(
+                  tooltip: 'Manage imported quiz',
+                  onPressed: onManage,
+                  icon: const Icon(Icons.more_vert),
+                )
+              else
+                const Icon(Icons.chevron_right_rounded),
             ],
           ),
         ),
