@@ -16,6 +16,11 @@ are kept in the app's private storage and remain available after restart.
 The planned YAML format is documented in
 [YAML Quiz Pack Guide](docs/YAML_QUIZ_GUIDE.md).
 
+## Mirrors
+
+- [GitHub](https://github.com/colbdavis/Labor-Mentis-Mobile)
+- [Codeberg](https://codeberg.org/colbdavis/Labor-Mentis-Mobile)
+
 ## Run
 
 ```zsh

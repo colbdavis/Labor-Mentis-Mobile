@@ -1018,13 +1018,13 @@ class ScoresPage extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
       children: [
         Text(
-          'I tuoi punteggi',
+          'Your scores',
           style: Theme.of(
             context,
           ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 4),
-        const Text('Risultati di questa sessione.'),
+        const Text('Results from this session.'),
         const SizedBox(height: 24),
         Container(
           padding: const EdgeInsets.all(24),
@@ -1036,7 +1036,7 @@ class ScoresPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'MEDIA COMPLESSIVA',
+                'OVERALL SCORE',
                 style: TextStyle(
                   color: colors.onTertiaryContainer.withValues(alpha: .8),
                   fontWeight: FontWeight.bold,
@@ -1053,7 +1053,7 @@ class ScoresPage extends StatelessWidget {
               ),
               Text(
                 total == 0
-                    ? 'Completa un quiz per iniziare.'
+                    ? 'Complete a quiz to get started.'
                     : '$correct correct answers out of $total',
                 style: TextStyle(
                   color: colors.onTertiaryContainer.withValues(alpha: .8),
