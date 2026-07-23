@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import 'app_theme.dart';
 import 'import/quiz_catalog.dart';
 import 'import/quiz_import_error.dart';
 import 'import/quiz_yaml_parser.dart';
@@ -13,8 +14,18 @@ import 'models/quiz_result.dart';
 
 void main() => runApp(const LaborMentisApp());
 
-const _indigo = indigo;
-const _mint = mint;
+Color _modeColor(BuildContext context, GameMode mode) {
+  final colors = Theme.of(context).colorScheme;
+  return switch (mode) {
+    GameMode.multipleChoice => colors.primary,
+    GameMode.trueFalse => colors.tertiary,
+    GameMode.text =>
+      colors.brightness == Brightness.dark
+          ? const Color(0xffffb86c)
+          : const Color(0xff9a4f00),
+    GameMode.matching => colors.secondary,
+  };
+}
 
 class LaborMentisApp extends StatelessWidget {
   const LaborMentisApp({super.key});
@@ -24,14 +35,9 @@ class LaborMentisApp extends StatelessWidget {
     return MaterialApp(
       title: 'Labor Mentis',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: _indigo,
-          brightness: Brightness.light,
-        ),
-        scaffoldBackgroundColor: const Color(0xfff8fafc),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system,
       home: const AppShell(),
     );
   }
@@ -368,16 +374,17 @@ class HomePage extends StatelessWidget {
 class _WelcomeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: _indigo,
+        color: colors.primaryContainer,
         borderRadius: BorderRadius.circular(24),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.auto_awesome_rounded, size: 36, color: Colors.white),
-          SizedBox(width: 16),
+          Icon(Icons.auto_awesome_rounded, size: 36, color: colors.primary),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -385,15 +392,17 @@ class _WelcomeCard extends StatelessWidget {
                 Text(
                   'Small today, expandable tomorrow',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: colors.onPrimaryContainer,
                     fontWeight: FontWeight.w700,
                     fontSize: 18,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   'Play the included quizzes and import your own YAML files.',
-                  style: TextStyle(color: Color(0xffe0e7ff)),
+                  style: TextStyle(
+                    color: colors.onPrimaryContainer.withValues(alpha: .8),
+                  ),
                 ),
               ],
             ),
@@ -419,6 +428,7 @@ class QuizPackCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mode = pack.mode;
+    final modeColor = _modeColor(context, mode);
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -428,8 +438,8 @@ class QuizPackCard extends StatelessWidget {
           child: Row(
             children: [
               CircleAvatar(
-                backgroundColor: mode.color.withValues(alpha: .12),
-                foregroundColor: mode.color,
+                backgroundColor: modeColor.withValues(alpha: .12),
+                foregroundColor: modeColor,
                 child: Icon(mode.icon),
               ),
               const SizedBox(width: 14),
@@ -440,7 +450,7 @@ class QuizPackCard extends StatelessWidget {
                     Text(
                       pack.category.toUpperCase(),
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: mode.color,
+                        color: modeColor,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -550,7 +560,7 @@ class _QuizPageState extends State<QuizPage> {
         ),
       );
     }
-    final color = widget.pack.mode.color;
+    final color = _modeColor(context, widget.pack.mode);
     final options = widget.pack.mode == GameMode.trueFalse
         ? const ['True', 'False']
         : _question.options;
@@ -703,27 +713,24 @@ class _AnswerButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final (background, foreground, border) = switch (state) {
       _AnswerState.correct => (
-        const Color(0xffdcfce7),
-        const Color(0xff166534),
-        const Color(0xff22c55e),
+        colors.tertiaryContainer,
+        colors.onTertiaryContainer,
+        colors.tertiary,
       ),
       _AnswerState.wrong => (
-        const Color(0xfffee2e2),
-        const Color(0xff991b1b),
-        const Color(0xffef4444),
+        colors.errorContainer,
+        colors.onErrorContainer,
+        colors.error,
       ),
       _AnswerState.disabled => (
         Colors.transparent,
-        Theme.of(context).colorScheme.onSurfaceVariant,
-        Theme.of(context).colorScheme.outlineVariant,
+        colors.onSurfaceVariant,
+        colors.outlineVariant,
       ),
-      _AnswerState.idle => (
-        Colors.white,
-        Theme.of(context).colorScheme.onSurface,
-        Theme.of(context).colorScheme.outline,
-      ),
+      _AnswerState.idle => (colors.surface, colors.onSurface, colors.outline),
     };
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -751,11 +758,15 @@ class _Feedback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = correct ? const Color(0xff166534) : const Color(0xff991b1b);
+    final colors = Theme.of(context).colorScheme;
+    final color = correct ? colors.tertiary : colors.error;
+    final foreground = correct
+        ? colors.onTertiaryContainer
+        : colors.onErrorContainer;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: .1),
+        color: correct ? colors.tertiaryContainer : colors.errorContainer,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -767,7 +778,7 @@ class _Feedback extends StatelessWidget {
               correct
                   ? 'Corretto. Ottimo lavoro!'
                   : 'Correct answer: $correctAnswer',
-              style: TextStyle(color: color, fontWeight: FontWeight.w600),
+              style: TextStyle(color: foreground, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -799,7 +810,7 @@ class QuizSummaryPage extends StatelessWidget {
                       ? Icons.celebration_outlined
                       : Icons.emoji_objects_outlined,
                   size: 64,
-                  color: result.pack.mode.color,
+                  color: _modeColor(context, result.pack.mode),
                 ),
                 const SizedBox(height: 20),
                 Text(
@@ -885,6 +896,8 @@ class _MatchingPageState extends State<MatchingPage> {
         .map((pair) => pair.right)
         .where((right) => !_matches.values.contains(right))
         .toList();
+    final matchingColor = _modeColor(context, GameMode.matching);
+    final colors = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: Text(widget.pack.title)),
       body: SafeArea(
@@ -893,16 +906,12 @@ class _MatchingPageState extends State<MatchingPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const _ProgressHeader(
-                index: 0,
-                total: 1,
-                color: Color(0xffa21caf),
-              ),
+              _ProgressHeader(index: 0, total: 1, color: matchingColor),
               const SizedBox(height: 28),
               Text(
                 'COLLEGA LE COPPIE',
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: const Color(0xffa21caf),
+                  color: matchingColor,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -926,7 +935,7 @@ class _MatchingPageState extends State<MatchingPage> {
                           onPressed: () => _selectLeft(pair.left),
                           style: OutlinedButton.styleFrom(
                             backgroundColor: selected
-                                ? const Color(0xfffae8ff)
+                                ? colors.secondaryContainer
                                 : null,
                           ),
                           child: Text(pair.left),
@@ -988,6 +997,7 @@ class ScoresPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final total = results.fold(0, (sum, item) => sum + item.total);
     final correct = results.fold(0, (sum, item) => sum + item.correct);
     final percentage = total == 0 ? 0 : (correct / total * 100).round();
@@ -1010,24 +1020,24 @@ class ScoresPage extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: _mint,
+            color: colors.tertiaryContainer,
             borderRadius: BorderRadius.circular(24),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'MEDIA COMPLESSIVA',
                 style: TextStyle(
-                  color: Color(0xffccfbf1),
+                  color: colors.onTertiaryContainer.withValues(alpha: .8),
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 6),
               Text(
                 '$percentage%',
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: colors.onTertiaryContainer,
                   fontSize: 44,
                   fontWeight: FontWeight.w800,
                 ),
@@ -1036,7 +1046,9 @@ class ScoresPage extends StatelessWidget {
                 total == 0
                     ? 'Completa un quiz per iniziare.'
                     : '$correct correct answers out of $total',
-                style: const TextStyle(color: Color(0xffccfbf1)),
+                style: TextStyle(
+                  color: colors.onTertiaryContainer.withValues(alpha: .8),
+                ),
               ),
             ],
           ),
@@ -1072,8 +1084,8 @@ class ScoresPage extends StatelessWidget {
             return Card(
               child: ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: _indigo.withValues(alpha: .12),
-                  foregroundColor: _indigo,
+                  backgroundColor: colors.primaryContainer,
+                  foregroundColor: colors.onPrimaryContainer,
                   child: const Icon(Icons.folder_outlined),
                 ),
                 title: Text(entry.key),
