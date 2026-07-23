@@ -903,84 +903,93 @@ class _MatchingPageState extends State<MatchingPage> {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _ProgressHeader(index: 0, total: 1, color: matchingColor),
-              const SizedBox(height: 28),
-              Text(
-                'COLLEGA LE COPPIE',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: matchingColor,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _question.prompt,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 20),
-              ..._question.pairs.map((pair) {
-                final selected = _selectedLeft == pair.left;
-                final match = _matches[pair.left];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => _selectLeft(pair.left),
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: selected
-                                ? colors.secondaryContainer
-                                : null,
-                          ),
-                          child: Text(pair.left),
-                        ),
+          child: CustomScrollView(
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _ProgressHeader(index: 0, total: 1, color: matchingColor),
+                    const SizedBox(height: 28),
+                    Text(
+                      'COLLEGA LE COPPIE',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: matchingColor,
+                        fontWeight: FontWeight.bold,
                       ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 8),
-                        child: Icon(Icons.arrow_forward_rounded, size: 18),
-                      ),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: null,
-                          child: Text(match ?? 'Choose below'),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _question.prompt,
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 20),
+                    ..._question.pairs.map((pair) {
+                      final selected = _selectedLeft == pair.left;
+                      final match = _matches[pair.left];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => _selectLeft(pair.left),
+                                style: OutlinedButton.styleFrom(
+                                  backgroundColor: selected
+                                      ? colors.secondaryContainer
+                                      : null,
+                                ),
+                                child: Text(pair.left),
+                              ),
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 8),
+                              child: Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 18,
+                              ),
+                            ),
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: null,
+                                child: Text(match ?? 'Choose below'),
+                              ),
+                            ),
+                          ],
                         ),
+                      );
+                    }),
+                    if (_selectedLeft != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Ora scegli il collegamento:',
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: availableRight
+                            .map(
+                              (right) => ActionChip(
+                                label: Text(right),
+                                onPressed: () => _selectRight(right),
+                              ),
+                            )
+                            .toList(),
                       ),
                     ],
-                  ),
-                );
-              }),
-              if (_selectedLeft != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'Ora scegli il collegamento:',
-                  style: Theme.of(context).textTheme.labelLarge,
+                    const Spacer(),
+                    FilledButton(
+                      onPressed: _matches.length == _question.pairs.length
+                          ? _finish
+                          : null,
+                      child: const Text('Check matches'),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: availableRight
-                      .map(
-                        (right) => ActionChip(
-                          label: Text(right),
-                          onPressed: () => _selectRight(right),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ],
-              const Spacer(),
-              FilledButton(
-                onPressed: _matches.length == _question.pairs.length
-                    ? _finish
-                    : null,
-                child: const Text('Check matches'),
               ),
             ],
           ),
