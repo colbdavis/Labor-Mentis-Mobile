@@ -110,6 +110,57 @@ questions:
       expect(result.warnings.single.path, 'future_field');
     });
 
+    test('reads an optional folder suggestion', () {
+      final result = parser.parse('''
+schema_version: 1
+id: filed-pack
+version: 1
+title: Filed pack
+category: Tests
+folder: Biology 101
+mode: text
+questions:
+  - prompt: Answer.
+    accepted_answers: [yes]
+''');
+      expect(result.isValid, isTrue);
+      expect(result.pack?.folder, 'Biology 101');
+      expect(result.warnings, isEmpty);
+    });
+
+    test('rejects a folder that is not a usable directory name', () {
+      final result = parser.parse('''
+schema_version: 1
+id: unsafe-pack
+version: 1
+title: Unsafe pack
+category: Tests
+folder: ../escape
+mode: text
+questions:
+  - prompt: Answer.
+    accepted_answers: [yes]
+''');
+      expect(result.isValid, isFalse);
+      expect(result.errors.single.path, 'folder');
+    });
+
+    test('leaves a pack without a folder unfiled', () {
+      final result = parser.parse('''
+schema_version: 1
+id: unfiled-pack
+version: 1
+title: Unfiled pack
+category: Tests
+mode: text
+questions:
+  - prompt: Answer.
+    accepted_answers: [yes]
+''');
+      expect(result.isValid, isTrue);
+      expect(result.pack?.folder, isNull);
+    });
+
     test('validates required pack fields', () {
       final result = parser.parse('schema_version: 2\nmode: unknown\n');
       final paths = result.errors.map((error) => error.path);

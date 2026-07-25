@@ -5,6 +5,7 @@ import 'package:yaml/yaml.dart';
 import '../models/game_mode.dart';
 import '../models/quiz_pack.dart';
 import '../models/quiz_question.dart';
+import 'quiz_folder.dart';
 import 'quiz_import_error.dart';
 
 class QuizYamlParser {
@@ -16,6 +17,7 @@ class QuizYamlParser {
     'title',
     'category',
     'description',
+    'folder',
     'mode',
     'questions',
   };
@@ -73,6 +75,7 @@ class QuizYamlParser {
     final description = root['description'] == null
         ? null
         : _text(root['description'], 'description', errors, max: 500);
+    final folder = _folder(root['folder'], errors);
     final mode = _mode(root['mode'], errors);
     final rawQuestions = root['questions'];
     if (rawQuestions is! YamlList && rawQuestions is! List) {
@@ -119,6 +122,7 @@ class QuizYamlParser {
         title: title,
         category: category,
         description: description,
+        folder: folder,
         mode: mode,
         questions: questions,
       ),
@@ -256,6 +260,24 @@ class QuizYamlParser {
             ? QuizQuestion(prompt: prompt, pairs: pairs)
             : null;
     }
+  }
+
+  /// Reads the optional folder suggestion. An unusable value is an error
+  /// rather than a silent fallback: a file asking to be stored outside its
+  /// directory must be reported, not filed somewhere else.
+  String? _folder(dynamic value, List<QuizImportIssue> errors) {
+    if (value == null) return null;
+    final name = value is String ? QuizFolder.normalize(value) : null;
+    if (name == null) {
+      errors.add(
+        const QuizImportIssue(
+          'folder',
+          'Must be 1 to ${QuizFolder.maxNameLength} letters, numbers, spaces, '
+              'hyphens, or underscores, starting with a letter or a number.',
+        ),
+      );
+    }
+    return name;
   }
 
   Map<String, dynamic>? _stringMap(

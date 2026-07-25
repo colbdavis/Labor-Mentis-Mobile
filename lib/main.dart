@@ -1,12 +1,11 @@
-import 'dart:convert';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import 'app_theme.dart';
+import 'import/quiz_batch_import.dart';
 import 'import/quiz_catalog.dart';
+import 'import/quiz_folder.dart';
 import 'import/quiz_import_error.dart';
-import 'import/quiz_yaml_parser.dart';
 import 'models/game_mode.dart';
 import 'models/quiz_pack.dart';
 import 'models/quiz_question.dart';
@@ -61,7 +60,19 @@ class _AppShellState extends State<AppShell> {
     super.initState();
     _catalog.addListener(_catalogChanged);
     _catalog.load().whenComplete(() {
-      if (mounted) setState(() => _loading = false);
+      if (!mounted) return;
+      setState(() => _loading = false);
+      final issues = [..._catalog.startupErrors];
+      if (issues.isEmpty) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${issues.length} stored file(s) could not be loaded.'),
+          action: SnackBarAction(
+            label: 'Details',
+            onPressed: () => _showIssues(issues, title: 'Stored quizzes'),
+          ),
+        ),
+      );
     });
   }
 
@@ -89,126 +100,87 @@ class _AppShellState extends State<AppShell> {
     final selection = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['yaml', 'yml'],
-      allowMultiple: false,
+      allowMultiple: true,
       withData: true,
     );
     if (selection == null || !mounted) return;
-    final file = selection.files.single;
-    if (!RegExp(r'\.ya?ml$', caseSensitive: false).hasMatch(file.name)) {
-      await _showIssues([
-        const QuizImportIssue('file', 'Choose a .yaml or .yml file.'),
-      ]);
-      return;
-    }
-    if (file.size > QuizYamlParser.maxSourceBytes) {
-      await _showIssues([
-        const QuizImportIssue('file', 'File exceeds the 1 MB limit.'),
-      ]);
-      return;
-    }
-    final bytes = file.bytes;
-    if (bytes == null) {
-      await _showIssues([
-        const QuizImportIssue('file', 'The selected file could not be read.'),
-      ]);
-      return;
-    }
-    String source;
-    try {
-      source = utf8.decode(bytes, allowMalformed: false);
-    } on FormatException {
-      await _showIssues([
-        const QuizImportIssue(
-          'file',
-          'The file must contain valid UTF-8 text.',
-        ),
-      ]);
-      return;
-    }
-    final result = QuizYamlParser().parse(source);
-    if (!result.isValid) {
-      await _showIssues([...result.errors, ...result.warnings]);
-      return;
-    }
-    final pack = result.pack as QuizPack;
-    if (_catalog.isBuiltInId(pack.id)) {
-      await _showIssues([
-        const QuizImportIssue(
-          'id',
-          'This ID belongs to a built-in quiz and cannot be overwritten.',
-        ),
-      ]);
-      return;
-    }
-    final existing = _catalog.find(pack.id);
-    final accepted = await _confirmImport(pack, existing, result.warnings);
-    if (accepted != true || !mounted) return;
-    try {
-      await _catalog.save(source, pack);
-    } catch (error) {
-      if (mounted) {
-        await _showIssues([
-          QuizImportIssue('file', 'Could not save the quiz: $error'),
-        ]);
-      }
-    }
-  }
-
-  Future<bool?> _confirmImport(
-    QuizPack pack,
-    QuizPack? existing,
-    List<QuizImportIssue> warnings,
-  ) {
-    final versionMessage = existing == null
-        ? null
-        : pack.version > existing.version
-        ? 'This updates version ${existing.version} to ${pack.version}.'
-        : pack.version < existing.version
-        ? 'Warning: this downgrades version ${existing.version} to ${pack.version}.'
-        : 'Version ${pack.version} is already installed. This will replace it.';
-    return showDialog<bool>(
+    final candidates = QuizBatchImporter().prepare(
+      [
+        for (final file in selection.files)
+          PickedQuizFile(file.name, file.bytes, size: file.size),
+      ],
+      installed: _catalog.find,
+      isBuiltIn: _catalog.isBuiltInId,
+    );
+    if (candidates.isEmpty) return;
+    final destination = await showModalBottomSheet<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(existing == null ? 'Import quiz?' : 'Replace quiz?'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(pack.title, style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 12),
-              Text(
-                'Category: ${pack.category}\nMode: ${pack.mode.label}\nQuestions: ${pack.questions.length}\nID: ${pack.id}\nVersion: ${pack.version}',
-              ),
-              if (versionMessage != null) ...[
-                const SizedBox(height: 12),
-                Text(versionMessage),
-              ],
-              if (warnings.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text('${warnings.length} warning(s) found.'),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(existing == null ? 'Import' : 'Replace'),
-          ),
-        ],
+      isScrollControlled: true,
+      builder: (_) => ImportReviewSheet(
+        candidates: candidates,
+        folders: _catalog.folders,
+        onCreateFolder: _createFolder,
       ),
     );
+    if (destination == null || !mounted) return;
+    await _saveCandidates(candidates, destination);
   }
 
-  Future<void> _showIssues(List<QuizImportIssue> issues) => showDialog<void>(
+  Future<void> _saveCandidates(
+    List<QuizImportCandidate> candidates,
+    String destination,
+  ) async {
+    final failures = <QuizImportIssue>[];
+    var imported = 0;
+    for (final candidate in candidates) {
+      final pack = candidate.pack;
+      final source = candidate.source;
+      if (!candidate.selected || pack == null || source == null) continue;
+      final folder = switch (destination) {
+        ImportReviewSheet.fromFile => pack.folder,
+        ImportReviewSheet.unfiled => null,
+        _ => destination,
+      };
+      try {
+        await _catalog.save(source, pack, folder: folder);
+        imported++;
+      } catch (error) {
+        failures.add(
+          QuizImportIssue(candidate.fileName, 'Could not save: $error'),
+        );
+      }
+    }
+    if (!mounted) return;
+    final rejected = candidates.where((entry) => !entry.canImport).toList();
+    final skipped = candidates
+        .where((entry) => entry.canImport && !entry.selected)
+        .length;
+    if (rejected.isEmpty && failures.isEmpty) {
+      _notify('${_quizCount(imported)} imported.');
+      return;
+    }
+    await _showIssues([
+      QuizImportIssue('summary', '${_quizCount(imported)} imported.'),
+      if (skipped > 0)
+        QuizImportIssue('summary', '$skipped file(s) were not selected.'),
+      for (final candidate in rejected)
+        QuizImportIssue(
+          candidate.fileName,
+          candidate.errors
+              .map((issue) => '${issue.path}: ${issue.message}')
+              .join('\n'),
+        ),
+      ...failures,
+    ], title: 'Import finished');
+  }
+
+  Future<void> _showIssues(
+    List<QuizImportIssue> issues, {
+    String title = 'Quiz could not be imported',
+  }) => showDialog<void>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Quiz could not be imported'),
+      title: Text(title),
       content: SizedBox(
         width: double.maxFinite,
         child: SingleChildScrollView(
@@ -228,46 +200,207 @@ class _AppShellState extends State<AppShell> {
 
   Future<void> _manageQuiz(QuizPack pack) async {
     if (!pack.isImported) return;
-    final remove = await showDialog<bool>(
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(pack.title),
+              subtitle: Text(
+                'Imported quiz · ID: ${pack.id} · Version ${pack.version}\n'
+                '${pack.folder ?? 'Unfiled'} · ${pack.questions.length} questions',
+              ),
+              isThreeLine: true,
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.drive_file_move_outlined),
+              title: const Text('Move to folder'),
+              onTap: () => Navigator.pop(context, 'move'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Remove from this device'),
+              onTap: () => Navigator.pop(context, 'remove'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (action == null || !mounted) return;
+    if (action == 'move') {
+      await _moveQuiz(pack);
+    } else {
+      await _removeQuiz(pack);
+    }
+  }
+
+  Future<void> _moveQuiz(QuizPack pack) async {
+    final choice = await _chooseFolder(current: pack.folder);
+    if (choice == null || !mounted) return;
+    await _catalog.move(pack.id, choice.folder);
+  }
+
+  Future<void> _removeQuiz(QuizPack pack) async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(pack.title),
-        content: Text(
-          'Imported quiz\nID: ${pack.id}\nVersion: ${pack.version}\n${pack.questions.length} questions',
-        ),
+        title: const Text('Remove imported quiz?'),
+        content: Text('Remove “${pack.title}” from this device?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Close'),
+            child: const Text('Cancel'),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Remove'),
           ),
         ],
       ),
     );
-    if (remove == true && mounted) {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Remove imported quiz?'),
-          content: Text('Remove “${pack.title}” from this device?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+    if (confirmed == true && mounted) await _catalog.remove(pack.id);
+  }
+
+  Future<_FolderChoice?> _chooseFolder({String? current}) async {
+    final choice = await showDialog<_FolderChoice>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Move to folder'),
+        children: [
+          ListTile(
+            leading: const Icon(Icons.inbox_outlined),
+            title: const Text('Unfiled'),
+            trailing: current == null ? const Icon(Icons.check) : null,
+            onTap: () => Navigator.pop(context, const _FolderChoice(null)),
+          ),
+          for (final folder in _catalog.folders)
+            ListTile(
+              leading: const Icon(Icons.folder_outlined),
+              title: Text(folder),
+              trailing: QuizFolder.sameName(folder, current)
+                  ? const Icon(Icons.check)
+                  : null,
+              onTap: () => Navigator.pop(context, _FolderChoice(folder)),
             ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Remove'),
+          ListTile(
+            leading: const Icon(Icons.create_new_folder_outlined),
+            title: const Text('New folder…'),
+            onTap: () => Navigator.pop(context, const _FolderChoice.create()),
+          ),
+        ],
+      ),
+    );
+    if (choice == null) return null;
+    if (!choice.isCreate) return choice;
+    if (!mounted) return null;
+    final created = await _createFolder();
+    return created == null ? null : _FolderChoice(created);
+  }
+
+  /// Creates a folder and returns its name as the catalog spells it.
+  Future<String?> _createFolder() async {
+    final name = await _askFolderName(title: 'New folder');
+    if (name == null || !mounted) return null;
+    try {
+      await _catalog.createFolder(name);
+      return _catalog.canonicalFolder(name);
+    } catch (error) {
+      _notify('Could not create the folder: $error');
+      return null;
+    }
+  }
+
+  Future<void> _manageFolder(String folder) async {
+    final packs = _catalog.packsInFolder(folder);
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(folder),
+              subtitle: Text('${_quizCount(packs.length)} in this folder'),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.drive_file_rename_outline),
+              title: const Text('Rename folder'),
+              onTap: () => Navigator.pop(context, 'rename'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.folder_delete_outlined),
+              title: const Text('Delete folder'),
+              onTap: () => Navigator.pop(context, 'delete'),
             ),
           ],
         ),
-      );
-      if (confirmed == true) await _catalog.remove(pack.id);
+      ),
+    );
+    if (action == null || !mounted) return;
+    if (action == 'rename') {
+      await _renameFolder(folder);
+    } else {
+      await _deleteFolder(folder, packs.length);
     }
   }
+
+  Future<void> _renameFolder(String folder) async {
+    final name = await _askFolderName(title: 'Rename folder', initial: folder);
+    if (name == null || !mounted) return;
+    try {
+      await _catalog.renameFolder(folder, name);
+    } catch (error) {
+      if (mounted) _notify('Could not rename the folder: $error');
+    }
+  }
+
+  Future<void> _deleteFolder(String folder, int packCount) async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete “$folder”?'),
+        content: Text(
+          packCount == 0
+              ? 'This folder is empty.'
+              : 'It holds ${_quizCount(packCount)}. They can stay on this '
+                    'device as unfiled quizzes.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          if (packCount > 0)
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'packs'),
+              child: const Text('Delete quizzes too'),
+            ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, 'folder'),
+            child: Text(packCount == 0 ? 'Delete' : 'Keep quizzes'),
+          ),
+        ],
+      ),
+    );
+    if (choice == null || !mounted) return;
+    await _catalog.deleteFolder(folder, deletePacks: choice == 'packs');
+  }
+
+  Future<String?> _askFolderName({required String title, String? initial}) =>
+      showDialog<String>(
+        context: context,
+        builder: (context) => _FolderNameDialog(title: title, initial: initial),
+      );
+
+  void _notify(String message) => ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text(message)));
+
+  String _quizCount(int count) => '$count ${count == 1 ? 'quiz' : 'quizzes'}';
 
   @override
   Widget build(BuildContext context) {
@@ -275,11 +408,13 @@ class _AppShellState extends State<AppShell> {
       body: SafeArea(
         child: _tab == 0
             ? HomePage(
-                packs: _catalog.packs,
+                catalog: _catalog,
                 loading: _loading,
                 onOpenQuiz: _openQuiz,
                 onImport: _importQuiz,
                 onManageQuiz: _manageQuiz,
+                onManageFolder: _manageFolder,
+                onCreateFolder: _createFolder,
               )
             : ScoresPage(results: _results),
       ),
@@ -303,23 +438,30 @@ class _AppShellState extends State<AppShell> {
 
 class HomePage extends StatelessWidget {
   const HomePage({
-    required this.packs,
+    required this.catalog,
     required this.loading,
     required this.onOpenQuiz,
     required this.onImport,
     required this.onManageQuiz,
+    required this.onManageFolder,
+    required this.onCreateFolder,
     super.key,
   });
 
-  final List<QuizPack> packs;
+  final QuizCatalog catalog;
   final bool loading;
   final ValueChanged<QuizPack> onOpenQuiz;
   final VoidCallback onImport;
   final ValueChanged<QuizPack> onManageQuiz;
+  final ValueChanged<String> onManageFolder;
+  final VoidCallback onCreateFolder;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final builtIn = catalog.packs.where((pack) => !pack.isImported).toList();
+    final folders = catalog.folders;
+    final unfiled = catalog.packsInFolder(null);
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
       children: [
@@ -350,23 +492,152 @@ class HomePage extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         if (loading) const LinearProgressIndicator(),
-        ...packs.map(
+        ...builtIn.map(
           (pack) => Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: QuizPackCard(
-              pack: pack,
-              onTap: () => onOpenQuiz(pack),
-              onManage: pack.isImported ? () => onManageQuiz(pack) : null,
-            ),
+            child: QuizPackCard(pack: pack, onTap: () => onOpenQuiz(pack)),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'My quizzes',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: onCreateFolder,
+              icon: const Icon(Icons.create_new_folder_outlined),
+              label: const Text('New folder'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Imported packs, grouped into folders you choose.',
+          style: theme.textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 10),
+        if (folders.isEmpty && unfiled.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'Nothing imported yet.',
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+        for (final folder in folders)
+          QuizFolderSection(
+            name: folder,
+            packs: catalog.packsInFolder(folder),
+            onOpenQuiz: onOpenQuiz,
+            onManageQuiz: onManageQuiz,
+            onManageFolder: () => onManageFolder(folder),
+          ),
+        if (unfiled.isNotEmpty)
+          QuizFolderSection(
+            name: 'Unfiled',
+            packs: unfiled,
+            onOpenQuiz: onOpenQuiz,
+            onManageQuiz: onManageQuiz,
+          ),
+        const SizedBox(height: 12),
         OutlinedButton.icon(
           onPressed: onImport,
           icon: const Icon(Icons.upload_file_outlined),
-          label: const Text('Import a YAML quiz'),
+          label: const Text('Import YAML quizzes'),
         ),
       ],
+    );
+  }
+}
+
+/// One expandable folder of imported packs. Passing no [onManageFolder] marks
+/// the section as the Unfiled group, which cannot be renamed or deleted.
+class QuizFolderSection extends StatefulWidget {
+  const QuizFolderSection({
+    required this.name,
+    required this.packs,
+    required this.onOpenQuiz,
+    required this.onManageQuiz,
+    this.onManageFolder,
+    super.key,
+  });
+
+  final String name;
+  final List<QuizPack> packs;
+  final ValueChanged<QuizPack> onOpenQuiz;
+  final ValueChanged<QuizPack> onManageQuiz;
+  final VoidCallback? onManageFolder;
+
+  @override
+  State<QuizFolderSection> createState() => _QuizFolderSectionState();
+}
+
+class _QuizFolderSectionState extends State<QuizFolderSection> {
+  bool _expanded = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final manage = widget.onManageFolder;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        children: [
+          ListTile(
+            leading: Icon(
+              manage == null ? Icons.inbox_outlined : Icons.folder_outlined,
+              color: colors.primary,
+            ),
+            title: Text(
+              widget.name,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            subtitle: Text(
+              '${widget.packs.length} ${widget.packs.length == 1 ? 'quiz' : 'quizzes'}',
+            ),
+            onTap: () => setState(() => _expanded = !_expanded),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (manage != null)
+                  IconButton(
+                    tooltip: 'Manage folder',
+                    onPressed: manage,
+                    icon: const Icon(Icons.more_vert),
+                  ),
+                Icon(
+                  _expanded
+                      ? Icons.expand_less_rounded
+                      : Icons.expand_more_rounded,
+                ),
+              ],
+            ),
+          ),
+          if (_expanded && widget.packs.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Column(
+                children: [
+                  for (final pack in widget.packs)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: QuizPackCard(
+                        pack: pack,
+                        onTap: () => widget.onOpenQuiz(pack),
+                        onManage: () => widget.onManageQuiz(pack),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -480,6 +751,231 @@ class QuizPackCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Result of the folder picker: null means the user cancelled, while a choice
+/// carrying a null folder means Unfiled.
+class _FolderChoice {
+  const _FolderChoice(this.folder) : isCreate = false;
+  const _FolderChoice.create() : folder = null, isCreate = true;
+
+  final String? folder;
+  final bool isCreate;
+}
+
+/// Shows every picked file with its outcome and lets the user deselect files
+/// and pick one destination for the whole batch. Returns the chosen
+/// destination, or null when the import is cancelled.
+class ImportReviewSheet extends StatefulWidget {
+  const ImportReviewSheet({
+    required this.candidates,
+    required this.folders,
+    required this.onCreateFolder,
+    super.key,
+  });
+
+  // Folder names cannot contain '*', so these cannot collide with a folder.
+  static const fromFile = '*from-file';
+  static const unfiled = '*unfiled';
+  static const _newFolder = '*new-folder';
+
+  final List<QuizImportCandidate> candidates;
+  final List<String> folders;
+  final Future<String?> Function() onCreateFolder;
+
+  @override
+  State<ImportReviewSheet> createState() => _ImportReviewSheetState();
+}
+
+class _ImportReviewSheetState extends State<ImportReviewSheet> {
+  late final List<String> _folders = [...widget.folders];
+  String _destination = ImportReviewSheet.fromFile;
+
+  Future<void> _changeDestination(String? value) async {
+    if (value == null) return;
+    if (value != ImportReviewSheet._newFolder) {
+      setState(() => _destination = value);
+      return;
+    }
+    final created = await widget.onCreateFolder();
+    if (!mounted || created == null) return;
+    setState(() {
+      if (!_folders.any((folder) => QuizFolder.sameName(folder, created))) {
+        _folders.add(created);
+      }
+      _destination = created;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final importable = widget.candidates.where((entry) => entry.canImport);
+    final selected = importable.where((entry) => entry.selected).length;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Review import',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${widget.candidates.length} file(s) selected.',
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 8),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final candidate in widget.candidates) _row(candidate),
+                ],
+              ),
+            ),
+            if (importable.isNotEmpty) ...[
+              const Divider(),
+              Text('Destination folder', style: theme.textTheme.labelLarge),
+              DropdownButton<String>(
+                isExpanded: true,
+                value: _destination,
+                onChanged: _changeDestination,
+                items: [
+                  const DropdownMenuItem(
+                    value: ImportReviewSheet.fromFile,
+                    child: Text('From each file'),
+                  ),
+                  const DropdownMenuItem(
+                    value: ImportReviewSheet.unfiled,
+                    child: Text('Unfiled'),
+                  ),
+                  for (final folder in _folders)
+                    DropdownMenuItem(value: folder, child: Text(folder)),
+                  const DropdownMenuItem(
+                    value: ImportReviewSheet._newFolder,
+                    child: Text('New folder…'),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: selected == 0
+                      ? null
+                      : () => Navigator.pop(context, _destination),
+                  child: Text('Import $selected'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _row(QuizImportCandidate candidate) {
+    final colors = Theme.of(context).colorScheme;
+    if (!candidate.canImport) {
+      final issue = candidate.errors.firstOrNull;
+      return ListTile(
+        leading: Icon(Icons.error_outline, color: colors.error),
+        title: Text(candidate.fileName),
+        subtitle: Text(
+          issue == null
+              ? 'This file was rejected.'
+              : '${issue.path}: ${issue.message}',
+        ),
+      );
+    }
+    final pack = candidate.pack;
+    final details = [
+      candidate.statusLabel,
+      if (pack != null) '${pack.questions.length} questions',
+      if (pack?.folder != null) 'folder: ${pack?.folder}',
+      if (candidate.warnings.isNotEmpty)
+        '${candidate.warnings.length} warning(s)',
+    ];
+    return CheckboxListTile(
+      value: candidate.selected,
+      onChanged: (value) => setState(() => candidate.selected = value ?? false),
+      title: Text(pack?.title ?? candidate.fileName),
+      subtitle: Text(details.join(' · ')),
+    );
+  }
+}
+
+class _FolderNameDialog extends StatefulWidget {
+  const _FolderNameDialog({required this.title, this.initial});
+
+  final String title;
+  final String? initial;
+
+  @override
+  State<_FolderNameDialog> createState() => _FolderNameDialogState();
+}
+
+class _FolderNameDialogState extends State<_FolderNameDialog> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initial ?? '',
+  );
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final name = QuizFolder.normalize(_controller.text);
+    if (name == null) {
+      setState(
+        () => _error =
+            'Use 1 to ${QuizFolder.maxNameLength} letters, numbers, spaces, '
+            'hyphens, or underscores, starting with a letter or a number.',
+      );
+      return;
+    }
+    Navigator.pop(context, name);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        maxLength: QuizFolder.maxNameLength,
+        decoration: InputDecoration(
+          labelText: 'Folder name',
+          errorText: _error,
+        ),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('Save')),
+      ],
     );
   }
 }

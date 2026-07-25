@@ -12,7 +12,8 @@ This document defines the implemented version 1 import format.
 2. Copy one of the examples below.
 3. Give the pack a unique, stable `id`.
 4. Choose exactly one `mode` for the whole pack.
-5. Save the file and select **Import a YAML quiz** in the app.
+5. Save the file and select **Import YAML quizzes** in the app. You can pick
+   several files in one go.
 
 YAML uses indentation to represent structure. Use spaces, not tabs. Two spaces
 per level is recommended.
@@ -30,8 +31,27 @@ Every pack needs these fields:
 | `category` | string | Group used in the catalog and score summary. |
 | `mode` | string | One of `multiple_choice`, `true_false`, `text`, or `matching`. |
 | `questions` | list | The quiz questions. |
+| `folder` | string | Optional. Folder the pack is filed into on import. |
 
-`description` is optional.
+`description` and `folder` are optional.
+
+## Folders
+
+Imported packs can be grouped into folders. A pack may suggest one with the
+optional `folder` field:
+
+```yaml
+folder: Biology 101
+```
+
+A folder name uses 1 to 40 letters, numbers, spaces, hyphens, or underscores,
+and starts with a letter or a number. Anything else is rejected, because the
+name is also used as a directory inside the app's private storage.
+
+The field is only a suggestion. During import you can send the whole selection
+to any folder, and afterwards you can move a pack with **Move to folder** in its
+manage menu. Folders are one level deep, and a pack without a folder is listed
+under **Unfiled**.
 
 ## Multiple choice
 
@@ -186,6 +206,9 @@ stable id, version 1, title, category, mode, and questions. Follow the mode
 rules exactly. Do not use Markdown fences or explanations.
 ```
 
+Add `Folder: [FOLDER]` to the prompt when you want every generated pack of a
+set to land in the same folder.
+
 Always review generated questions and answers before importing them. AI output
 can contain factual errors, ambiguous wording, or invalid YAML.
 
@@ -193,7 +216,9 @@ can contain factual errors, ambiguous wording, or invalid YAML.
 
 The importer accepts only local `.yaml` and `.yml` files. It does not
 download content, follow links, execute code, or contact an AI service. Files
-must be no larger than 1 MB and may contain up to 500 questions.
+must be no larger than 1 MB and may contain up to 500 questions. One import can
+carry up to 25 files, and each file is reviewed and stored on its own, so an
+invalid file never blocks the valid ones next to it.
 
 For the complete implementation and validation plan, see
 [PLAN.md](../PLAN.md).

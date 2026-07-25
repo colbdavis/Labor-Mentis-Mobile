@@ -9,8 +9,11 @@ repository. Keep it accurate when the project's structure or conventions change.
 - A local-first quiz app with four playable modes: **multiple choice**,
   **true/false**, **text answer**, and **matching pairs**.
 - Ships with built-in quiz packs and can **import user-supplied YAML quiz packs**
-  from local storage. Imported packs are validated, stored in the app's private
-  directory, and survive restarts.
+  from local storage, several files at a time. Imported packs are validated,
+  stored in the app's private directory, and survive restarts.
+- Imported packs can be filed into one level of **folders**. A folder is the
+  subdirectory holding the pack's YAML file, so placement needs no metadata
+  file; folder names are validated before any path is built from them.
 - A **Scores** screen computes the overall average and groups results by category.
 - No account, server, analytics, or network access is required for any feature.
 
@@ -39,10 +42,15 @@ lib/
   import/
     quiz_yaml_parser.dart         YAML text -> QuizPack or structured errors
     quiz_import_error.dart        Import issue/error types
+    quiz_folder.dart              Folder-name rules for imported packs
+    quiz_batch_import.dart        Multi-file selection -> reviewable candidates
     quiz_catalog.dart             ChangeNotifier merging built-in + imported packs
 test/
   widget_test.dart                Smoke test opening a built-in quiz
   quiz_yaml_parser_test.dart      Parser/validation tests
+  quiz_folder_test.dart           Folder-name validation tests
+  quiz_batch_import_test.dart     Batch preparation tests
+  quiz_catalog_test.dart          Storage, folder, and reload tests
 docs/YAML_QUIZ_GUIDE.md           User-facing YAML schema documentation
 PLAN.md                           Implementation guide for YAML quiz import
 flutter-guide.md                  Local dev environment / SDK / device notes
